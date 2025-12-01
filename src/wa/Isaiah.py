@@ -1,224 +1,218 @@
 import pygame
 import random
+import math
 
 pygame.init()
 
-# -------------------------------
-# SETTINGS (tuned for speed)
-# -------------------------------
+# ---------------------------------------
+# SETTINGS (all tuned for performance)
+# ---------------------------------------
 W, H = 800, 600
 FPS = 60
 
-STAR_MAX = 12
-LASER_MAX = 20
+STAR_COUNT = 5          # very low = no lag
+STAR_SPEED = 3
+STAR_SIZE = 32          # bigger stars
+TRAIL_LENGTH = 6        # short = fast performance
 
-STAR_SPEED_MIN = 2
-STAR_SPEED_MAX = 4
+LASER_SPEED = 10
+LASER_COOLDOWN = 180    # ms
 
-LASER_SPEED = 8
-CANNON_SPEED = 6
-
-# colors
+# Colors
 BLACK = (0, 0, 0)
-RED   = (255, 40, 40)
-GOLD  = (255, 220, 60)
+RED = (255, 60, 60)
+GOLD = (255, 215, 80)
 WHITE = (255, 255, 255)
 
 screen = pygame.display.set_mode((W, H))
-pygame.display.set_caption("Galaga FAST — No Lag")
-
-font = pygame.font.SysFont(None, 30)
+pygame.display.set_caption("Shooting Stars (Fast Mode)")
 clock = pygame.time.Clock()
 
-# -------------------------------
-# GAME OBJECTS
-# -------------------------------
+font = pygame.font.SysFont(None, 32)
 
+
+# ---------------------------------------
+# DRAW A STAR SHAPE
+# ---------------------------------------
+def draw_star(surf, x, y, size, color):
+    pts = []
+    spikes = 5
+    outer = size
+    inner = size * 0.45
+
+    angle = math.pi / 2
+    step = math.pi / spikes
+
+    for i in range(spikes * 2):
+        r = outer if i % 2 == 0 else inner
+        px = x + math.cos(angle) * r
+        py = y - math.sin(angle) * r
+        pts.append((px, py))
+        angle += step
+
+    pygame.draw.polygon(surf, color, pts)
+
+
+# ---------------------------------------
+# GAME OBJECTS
+# ---------------------------------------
 class Cannon:
     def __init__(self):
         self.x = W // 2
-        self.y = H - 40
-        self.w = 50
-        self.h = 20
-        self.score = 0
+        self.y = H - 60
+        self.speed = 10
         self.lives = 3
+        self.score = 0
 
-    @property
-    def rect(self):
-        return pygame.Rect(self.x - self.w//2, self.y - self.h//2, self.w, self.h)
-
-    def move(self, dx):
-        self.x = max(25, min(W - 25, self.x + dx))
+    def update(self, left, right):
+        if left:
+            self.x -= self.speed
+        if right:
+            self.x += self.speed
+        self.x = max(20, min(W - 20, self.x))
 
     def draw(self):
-        pygame.draw.rect(screen, WHITE, self.rect)
-        pygame.draw.rect(screen, WHITE, (self.x - 3, self.y - 35, 6, 25))
+        pygame.draw.rect(screen, WHITE, (self.x - 25, self.y, 50, 20))
+        pygame.draw.rect(screen, WHITE, (self.x - 4, self.y - 20, 8, 20))
+
 
 class Laser:
     def __init__(self, x, y):
         self.x = x
         self.y = y
 
-    @property
-    def rect(self):
-        return pygame.Rect(self.x - 2, self.y - 12, 4, 12)
-
     def update(self):
         self.y -= LASER_SPEED
 
-    def draw(self):
-        pygame.draw.rect(screen, RED, self.rect)
-
     def offscreen(self):
-        return self.y < -20
+        return self.y < -10
+
+    def rect(self):
+        return pygame.Rect(self.x - 3, self.y - 6, 6, 12)
+
+    def draw(self):
+        pygame.draw.rect(screen, RED, (self.x - 2, self.y - 10, 4, 10))
+
 
 class Star:
     def __init__(self):
-        self.x = random.randint(20, W - 20)
-        self.y = -20
-        self.speed = random.uniform(STAR_SPEED_MIN, STAR_SPEED_MAX)
-        self.r = 12
+        self.reset()
 
-    @property
-    def rect(self):
-        return pygame.Rect(self.x - self.r, self.y - self.r, self.r*2, self.r*2)
+    def reset(self):
+        self.x = random.randint(50, W - 50)
+        self.y = random.randint(-600, -50)
+        self.speed = STAR_SPEED
+        self.trail = [(self.x, self.y)] * TRAIL_LENGTH
 
     def update(self):
+        self.trail.append((self.x, self.y))
+        self.trail.pop(0)
         self.y += self.speed
 
-    def draw(self):
-        # star body
-        pygame.draw.circle(screen, GOLD, (int(self.x), int(self.y)), self.r)
-        # simple streak (fast)
-        pygame.draw.line(screen, GOLD, (self.x, self.y), (self.x, self.y - 20), 3)
+    def rect(self):
+        return pygame.Rect(self.x - STAR_SIZE, self.y - STAR_SIZE, STAR_SIZE * 2, STAR_SIZE * 2)
 
     def offscreen(self):
-        return self.y > H + 30
+        return self.y > H + 50
 
-# -------------------------------
-# GAME LOOP
-# -------------------------------
+    def draw(self):
+        # Trail (golden fading lines)
+        for i, (tx, ty) in enumerate(self.trail):
+            fade = int(255 * (i / TRAIL_LENGTH))
+            pygame.draw.circle(screen, (255, 215, 80, fade), (int(tx), int(ty)), 6)
+
+        # Star shape
+        draw_star(screen, self.x, self.y, STAR_SIZE, GOLD)
+
+
+# ---------------------------------------
+# MAIN GAME LOOP
+# ---------------------------------------
 def main():
-    running = True
     cannon = Cannon()
     lasers = []
-    stars = []
+    stars = [Star() for _ in range(STAR_COUNT)]
 
     last_laser = 0
-    last_spawn = 0
+    running = True
 
-    move_left = move_right = False
+    left = right = False
 
     while running:
         dt = clock.tick(FPS)
-        now = pygame.time.get_ticks()
+        time_now = pygame.time.get_ticks()
 
-        # -------------------------
-        # INPUT
-        # -------------------------
+        # ---------------- INPUT ----------------
         for e in pygame.event.get():
             if e.type == pygame.QUIT:
                 running = False
-            if e.type == pygame.KEYDOWN:
-                if e.key in (pygame.K_LEFT, pygame.K_a): move_left = True
-                if e.key in (pygame.K_RIGHT, pygame.K_d): move_right = True
-            if e.type == pygame.KEYUP:
-                if e.key in (pygame.K_LEFT, pygame.K_a): move_left = False
-                if e.key in (pygame.K_RIGHT, pygame.K_d): move_right = False
+            elif e.type == pygame.KEYDOWN:
+                if e.key in (pygame.K_LEFT, pygame.K_a):
+                    left = True
+                if e.key in (pygame.K_RIGHT, pygame.K_d):
+                    right = True
+                if e.key == pygame.K_ESCAPE:
+                    running = False
+            elif e.type == pygame.KEYUP:
+                if e.key in (pygame.K_LEFT, pygame.K_a):
+                    left = False
+                if e.key in (pygame.K_RIGHT, pygame.K_d):
+                    right = False
 
-        # move cannon
-        dx = (-CANNON_SPEED if move_left else 0) + (CANNON_SPEED if move_right else 0)
-        cannon.move(dx)
+        # ---------------- UPDATE ----------------
+        cannon.update(left, right)
 
-        # -------------------------
-        # AUTOFIRE (laser cap)
-        # -------------------------
-        if now - last_laser > 180 and len(lasers) < LASER_MAX:
-            lasers.append(Laser(cannon.x, cannon.y - 30))
-            last_laser = now
+        # Auto-fire
+        if time_now - last_laser > LASER_COOLDOWN:
+            lasers.append(Laser(cannon.x, cannon.y - 20))
+            last_laser = time_now
 
-        # -------------------------
-        # SPAWN STARS (star cap)
-        # -------------------------
-        if now - last_spawn > 550 and len(stars) < STAR_MAX:
-            stars.append(Star())
-            last_spawn = now
-
-        # -------------------------
-        # UPDATE LASERS
-        # -------------------------
         for l in lasers:
             l.update()
         lasers = [l for l in lasers if not l.offscreen()]
 
-        # -------------------------
-        # UPDATE STARS
-        # -------------------------
         for s in stars:
             s.update()
 
-        # -------------------------
-        # COLLISIONS: lasers → stars
-        # -------------------------
+        # COLLISION: laser hits star
         for l in lasers[:]:
-            for s in stars[:]:
-                if l.rect.colliderect(s.rect):
-                    try:
-                        lasers.remove(l)
-                        stars.remove(s)
-                    except ValueError:
-                        pass
+            for s in stars:
+                if l.rect().colliderect(s.rect()):
+                    lasers.remove(l)
+                    s.reset()
                     cannon.score += 10
                     break
 
-        # -------------------------
-        # CHECK BOTTOM (lose life)
-        # -------------------------
-        for s in stars[:]:
-            if s.offscreen():     # ship touches bottom
-                stars.remove(s)
+        # LOSE LIFE: star reaches bottom
+        for s in stars:
+            if s.offscreen():
                 cannon.lives -= 1
-                if cannon.lives <= 0:
-                    running = False
+                s.reset()
 
-        # -------------------------
-        # DRAW EVERYTHING
-        # -------------------------
+        if cannon.lives <= 0:
+            running = False
+
+        # ---------------- DRAW ----------------
         screen.fill(BLACK)
 
-        # draw stars
+        # stars
         for s in stars:
             s.draw()
 
-        # draw lasers
+        # lasers
         for l in lasers:
             l.draw()
 
-        # draw cannon
+        # cannon
         cannon.draw()
 
-        # HUD
-        score_text = font.render(f"Score: {cannon.score}", True, WHITE)
-        lives_text = font.render(f"Lives: {cannon.lives}", True, WHITE)
-        screen.blit(score_text, (10, 10))
-        screen.blit(lives_text, (10, 40))
+        # UI
+        screen.blit(font.render(f"Score: {cannon.score}", True, WHITE), (10, 10))
+        screen.blit(font.render(f"Lives: {cannon.lives}", True, WHITE), (10, 40))
 
         pygame.display.flip()
 
-    # -------------------------
-    # GAME OVER SCREEN
-    # -------------------------
-    screen.fill(BLACK)
-    over = font.render("GAME OVER", True, RED)
-    final = font.render(f"Final Score: {cannon.score}", True, WHITE)
-    screen.blit(over, (W//2 - over.get_width()//2, H//2 - 40))
-    screen.blit(final, (W//2 - final.get_width()//2, H//2))
-    pygame.display.flip()
-
-    pygame.time.wait(2000)
-
-
-if __name__ == "__main__":
-    main()
     pygame.quit()
 
+
+main()
