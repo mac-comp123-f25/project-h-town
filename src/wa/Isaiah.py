@@ -1,46 +1,39 @@
 import pygame, random, math
 
-pygame.init()
+pygame.init() #Giving us ability to use Pygame
 
-# ---------------- SETTINGS ----------------
-W, H = 800, 600
+W, H = 1000, 900 #Width and height of screen
 FPS = 60
 
-STAR_COUNT   = 5
-STAR_SPEED   = 3
-STAR_SIZE    = 32
+"""Base numbers for normal difficulty, these will change depending on difficulty chosen"""
+STAR_COUNT   = 5 #amount of stars that can exist at once
+STAR_SPEED   = 3 # How fast stars drop down
+STAR_SIZE    = 32 #Size of the stars
+LASER_SPEED  = 12 #how fast laser travel
+LASER_COOLDOWN = 180 #time between each shot
 
-LASER_SPEED  = 10
+"""Using RGB values"""
+BLACK = (40, 30, 100) #Background
+RED   = (255, 255, 255) #Lasers
+GOLD  = (255, 215, 80) #Stars
+WHITE = (255, 60, 60) #Stats/options and cannon
 
-BLACK = (40, 30, 100)
-RED   = (255, 255, 255)
-GOLD  = (255, 215, 80)
-WHITE = (255, 60, 60)
+screen = pygame.display.set_mode((W, H)) #creates window for game to popup
+pygame.display.set_caption("HYPER STAR SHOOTER") #Adds title to top of Window
+clock = pygame.time.Clock() #Clock is a builtin Pygame class, games run in loops, so it needs a clock
+font = pygame.font.SysFont(None, 32) #another pygame thing, a font that draws what shows up on screen
 
-screen = pygame.display.set_mode((W, H))
-pygame.display.set_caption("Shooting Stars (Fast Mode)")
-clock = pygame.time.Clock()
-font = pygame.font.SysFont(None, 32)
-
-
-# ---------------- STAR DRAWING ----------------
-def draw_star(surf, x, y, size, color):
-    pts = []
-    spikes = 5
-    outer = size
-    inner = size * 0.45
-    angle = math.pi / 2
-    step = math.pi / spikes
-
-    for i in range(spikes * 2):
-        r = outer if i % 2 == 0 else inner
-        pts.append((x + math.cos(angle) * r, y - math.sin(angle) * r))
+def draw_star(surf, x, y, size, color): #surf is basically giving a surface for drawing to be done
+    pts, spikes = [], 5 #stores that the star should have 5 points
+    outer, inner = size, size * 0.45 #forms how the radius from center of star to inner and outer points will be
+    angle, step = math.pi / 2, math.pi / spikes #starting direction to draw star points
+    for i in range(spikes * 2): #makes sure that it loops around 10 times total 2 times= 1 inner & 1 outer point/spike
+        r = outer if i % 2 == 0 else inner #if loop # is even or odd it will decide of its outer or inner point
+        pts.append((x + math.cos(angle) * r, y - math.sin(angle) * r)) #calculates position (x,y) for points around a circle for the star
         angle += step
-
     pygame.draw.polygon(surf, color, pts)
 
 
-# ---------------- EXPLOSION ----------------
 class Explosion:
     def __init__(self, x, y):
         self.particles = [
@@ -67,7 +60,6 @@ class Explosion:
                 pygame.draw.circle(surf, GOLD, (int(x), int(y)), max(1, life // 3))
 
 
-# ---------------- CANNON ----------------
 class Cannon:
     def __init__(self):
         self.x, self.y = W // 2, H - 60
@@ -84,7 +76,6 @@ class Cannon:
             self.x -= self.speed
         if keys[pygame.K_d] or keys[pygame.K_RIGHT]:
             self.x += self.speed
-
         self.x = max(20, min(W - 20, self.x))
 
     def draw(self, surf):
@@ -93,7 +84,6 @@ class Cannon:
         pygame.draw.rect(surf, WHITE, (x - 4,  y - 20, 8, 20))
 
 
-# ---------------- LASER ----------------
 class Laser:
     def __init__(self, x, y):
         self.x, self.y = x, y
@@ -112,7 +102,6 @@ class Laser:
         pygame.draw.rect(surf, RED, (self.x - 2, self.y - 10, 4, 10))
 
 
-# ---------------- STAR ----------------
 class Star:
     def __init__(self):
         self.reset()
@@ -136,37 +125,58 @@ class Star:
         draw_star(surf, self.x, self.y, STAR_SIZE, GOLD)
 
 
-# ---------------- GAME LOOP ----------------
+# -------- DIFFICULTY PICKER --------
+def choose_difficulty():
+    choosing = True
+    star_speed, fire_rate = STAR_SPEED, LASER_COOLDOWN
+
+    while choosing:
+        for e in pygame.event.get():
+            if e.type == pygame.QUIT:
+                pygame.quit()
+                raise SystemExit
+            if e.type == pygame.KEYDOWN:
+                if e.key == pygame.K_1:      # Easy
+                    star_speed, fire_rate = 2, 260
+                    choosing = False
+                elif e.key == pygame.K_2:    # Normal
+                    star_speed, fire_rate = 4, 180
+                    choosing = False
+                elif e.key == pygame.K_3:    # Hard
+                    star_speed, fire_rate = 7, 100
+                    choosing = False
+
+        screen.fill(BLACK)
+        lines = [
+            "Choose Difficulty",
+            "1 - Easy   (slow stars, slow fire)",
+            "2 - Normal (medium stars, normal fire)",
+            "3 - Hard   (fast stars, rapid fire)",
+        ]
+        for i, text in enumerate(lines):
+            surf = font.render(text, True, WHITE)
+            screen.blit(surf, (W//2 - surf.get_width()//2, H//2 - 80 + i*40))
+
+        pygame.display.flip()
+        clock.tick(30)
+
+    return star_speed, fire_rate
+
+
 def main():
-    # ------ DIFFICULTY INPUT ------
-    print("\nChoose difficulty:")
-    print("1 = Easy   (fast lasers)")
-    print("2 = Medium (normal)")
-    print("3 = Hard   (slow lasers)\n")
+    global STAR_SPEED, LASER_COOLDOWN
+    STAR_SPEED, LASER_COOLDOWN = choose_difficulty()
 
-    choice = input("Enter 1, 2, or 3: ").strip()
-
-    if choice == "1":
-        LASER_COOLDOWN = 200
-    elif choice == "3":
-        LASER_COOLDOWN = 600
-    else:
-        LASER_COOLDOWN = 400  # default medium
-
-    # ------ SETUP ------
     cannon = Cannon()
-    lasers = []
-    stars = [Star() for _ in range(STAR_COUNT)]
+    lasers, stars = [], [Star() for _ in range(STAR_COUNT)]
     explosions = []
     last_laser = 0
-
     running = True
 
     while running:
-        dt = clock.tick(FPS)
+        clock.tick(FPS)
         now = pygame.time.get_ticks()
 
-        # events
         for e in pygame.event.get():
             if e.type == pygame.QUIT:
                 running = False
@@ -176,7 +186,6 @@ def main():
         keys = pygame.key.get_pressed()
         cannon.update(keys)
 
-        # shooting
         if now - last_laser > LASER_COOLDOWN:
             x, y = cannon.pos
             lasers.append(Laser(x, y - 20))
@@ -203,7 +212,7 @@ def main():
                     cannon.score += 10
                     break
 
-        # lives lost
+        # lives
         for s in stars:
             if s.offscreen():
                 cannon.lives -= 1
@@ -212,9 +221,8 @@ def main():
         if cannon.lives <= 0:
             running = False
 
-        # drawing
+        # -------- DRAW --------
         screen.fill(BLACK)
-
         for s in stars:
             s.draw(screen)
         for l in lasers:
@@ -225,11 +233,10 @@ def main():
 
         screen.blit(font.render(f"Score: {cannon.score}", True, WHITE), (10, 10))
         screen.blit(font.render(f"Lives: {cannon.lives}", True, WHITE), (10, 40))
-
         pygame.display.flip()
 
     pygame.quit()
 
-
 if __name__ == "__main__":
     main()
+

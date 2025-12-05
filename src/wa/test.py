@@ -7,7 +7,7 @@ W, H = 800, 600
 FPS = 60
 
 STAR_COUNT   = 5
-STAR_SPEED   = 3          # base value; will be overwritten by difficulty
+STAR_SPEED   = 3          # base; overwritten by difficulty
 STAR_SIZE    = 32
 LASER_SPEED  = 10
 LASER_COOLDOWN = 180      # ms
@@ -125,12 +125,10 @@ class Star:
         draw_star(surf, self.x, self.y, STAR_SIZE, GOLD)
 
 
-# ------------- NEW: DIFFICULTY PICKER -------------
+# -------- DIFFICULTY PICKER --------
 def choose_difficulty():
-    """Let the player pick difficulty: sets star speed AND fire rate."""
     choosing = True
-    star_speed = STAR_SPEED
-    fire_rate = LASER_COOLDOWN
+    star_speed, fire_rate = STAR_SPEED, LASER_COOLDOWN
 
     while choosing:
         for e in pygame.event.get():
@@ -138,52 +136,45 @@ def choose_difficulty():
                 pygame.quit()
                 raise SystemExit
             if e.type == pygame.KEYDOWN:
-                if e.key == pygame.K_1:     # EASY
-                    star_speed = 2
-                    fire_rate = 260         # slower shooting
+                if e.key == pygame.K_1:      # Easy
+                    star_speed, fire_rate = 2, 260
                     choosing = False
-                elif e.key == pygame.K_2:   # NORMAL
-                    star_speed = 4
-                    fire_rate = 180         # default
+                elif e.key == pygame.K_2:    # Normal
+                    star_speed, fire_rate = 4, 180
                     choosing = False
-                elif e.key == pygame.K_3:   # HARD
-                    star_speed = 7
-                    fire_rate = 100         # fast shooting
+                elif e.key == pygame.K_3:    # Hard
+                    star_speed, fire_rate = 7, 100
                     choosing = False
 
         screen.fill(BLACK)
-        title = font.render("Choose Difficulty", True, WHITE)
-        opt1  = font.render("1 - Easy   (slow stars, slow fire)", True, WHITE)
-        opt2  = font.render("2 - Normal (medium stars, normal fire)", True, WHITE)
-        opt3  = font.render("3 - Hard   (fast stars, rapid fire)", True, WHITE)
-
-        screen.blit(title, (W//2 - title.get_width()//2, H//2 - 80))
-        screen.blit(opt1,  (W//2 - opt1.get_width()//2,  H//2 - 30))
-        screen.blit(opt2,  (W//2 - opt2.get_width()//2,  H//2 + 10))
-        screen.blit(opt3,  (W//2 - opt3.get_width()//2,  H//2 + 50))
+        lines = [
+            "Choose Difficulty",
+            "1 - Easy   (slow stars, slow fire)",
+            "2 - Normal (medium stars, normal fire)",
+            "3 - Hard   (fast stars, rapid fire)",
+        ]
+        for i, text in enumerate(lines):
+            surf = font.render(text, True, WHITE)
+            screen.blit(surf, (W//2 - surf.get_width()//2, H//2 - 80 + i*40))
 
         pygame.display.flip()
         clock.tick(30)
 
     return star_speed, fire_rate
 
-# --------------------------------------------------
-
 
 def main():
-    global STAR_SPEED
-    # pick difficulty BEFORE making stars
+    global STAR_SPEED, LASER_COOLDOWN
     STAR_SPEED, LASER_COOLDOWN = choose_difficulty()
 
     cannon = Cannon()
-    lasers = []
-    stars = [Star() for _ in range(STAR_COUNT)]
+    lasers, stars = [], [Star() for _ in range(STAR_COUNT)]
     explosions = []
     last_laser = 0
     running = True
 
     while running:
-        dt = clock.tick(FPS)
+        clock.tick(FPS)
         now = pygame.time.get_ticks()
 
         for e in pygame.event.get():
@@ -232,7 +223,6 @@ def main():
 
         # -------- DRAW --------
         screen.fill(BLACK)
-
         for s in stars:
             s.draw(screen)
         for l in lasers:
@@ -243,7 +233,6 @@ def main():
 
         screen.blit(font.render(f"Score: {cannon.score}", True, WHITE), (10, 10))
         screen.blit(font.render(f"Lives: {cannon.lives}", True, WHITE), (10, 40))
-
         pygame.display.flip()
 
     pygame.quit()
@@ -251,5 +240,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
-

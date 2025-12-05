@@ -95,7 +95,6 @@ class Star:
     def __init__(self):
         self.x = random.uniform(30, SCREEN_W - 30)
         self.y = -20
-        # give slight horizontal velocity to make them 'shooting'
         self.vx = random.uniform(-1.2, 1.2)
         self.vy = random.uniform(STAR_MIN_SPEED, STAR_MAX_SPEED)
         self.radius = random.randint(10, 16)
