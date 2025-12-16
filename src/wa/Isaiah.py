@@ -149,9 +149,9 @@ def choose_difficulty():
         screen.fill(BLACK)
         lines = [
             "Choose Difficulty",
-            "1 - Easy   (slow stars, slow fire)",
+            "1 - Easy   (slow stars, rapid fire)",
             "2 - Normal (medium stars, normal fire)",
-            "3 - Hard   (fast stars, rapid fire)",
+            "3 - Hard   (fast stars, slow fire)",
         ]
         for i, text in enumerate(lines):
             surf = font.render(text, True, WHITE)
